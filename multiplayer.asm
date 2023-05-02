@@ -1,0 +1,252 @@
+PLAYER_INPUT EQU P0
+LAST_PI EQU 0x20
+LAST_CPU EQU 0x21
+BOARD_X1_Y1 EQU 0x28
+BOARD_X2_Y1 EQU 0x29
+BOARD_X3_Y1 EQU 0x2A
+BOARD_X1_Y2 EQU 0x30
+BOARD_X2_Y2 EQU 0x31
+BOARD_X3_Y2 EQU 0x32
+BOARD_X1_Y3 EQU 0x38
+BOARD_X2_Y3 EQU 0x39
+BOARD_X3_Y3 EQU 0x3A
+ACTIVE_PLAYER EQU 0x22 ; 0 -> Player, 1 -> CPU
+VAL_PL EQU 0x25
+VAL_CP EQU 0x26
+WINNER EQU 0x35
+CNT_MOV EQU 0x27
+TMP_1 EQU 0x2F
+TMP_2 EQU 0x37
+TMP_3 EQU 0x3F
+
+INIT:
+  MOV PLAYER_INPUT, #00h
+  MOV LAST_PI, #00h
+  MOV LAST_CPU, #00h
+  MOV BOARD_X1_Y1, #00h
+  MOV BOARD_X2_Y1, #00h
+  MOV BOARD_X3_Y1, #00h
+  MOV BOARD_X1_Y2, #00h
+  MOV BOARD_X2_Y2, #00h
+  MOV BOARD_X3_Y2, #00h
+  MOV BOARD_X1_Y3, #00h
+  MOV BOARD_X2_Y3, #00h
+  MOV BOARD_X3_Y3, #00h
+  MOV ACTIVE_PLAYER, #00h
+  MOV VAL_PL, #11h
+  MOV VAL_CP, #0FFh
+  MOV CNT_MOV, #1h
+  MOV WINNER, #00h
+  MOV CNT_MOV, #00h
+  MOV TMP_1, #00h
+  MOV TMP_2, #00h
+  MOV TMP_3, #00h
+
+BEGIN: ; Main loop
+ACALL SUB_READ_PLAYER_INPUT
+ACALL SUB_MODIFY_BOARD
+  JMP BEGIN
+
+GAME_OVER: ; Game over loop (waiting for reset)
+  ACALL AWAIT_RESET
+  JMP GAME_OVER
+
+SUB_READ_PLAYER_INPUT:
+  MOV A, PLAYER_INPUT
+  CJNE A, #00h, SSPI_SAVE
+    CLR A
+    RET
+  SSPI_SAVE:
+    MOV LAST_PI, A
+    CLR A
+    MOV PLAYER_INPUT, #00h
+    RET
+
+SUB_MODIFY_BOARD:
+  MOV A, LAST_PI
+  MOV LAST_PI, #00h
+
+  CJNE A, #01h, PT_IS_2 ; Is player Input 1?
+    MOV A, BOARD_X1_Y1
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X1_Y1, A
+    JMP PT_FINALLY
+  PT_IS_2: CJNE A, #02h, PT_IS_3 ; Is player input 2?
+    MOV A, BOARD_X2_Y1
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X2_Y1, A
+    JMP PT_FINALLY
+  PT_IS_3: CJNE A, #03h, PT_IS_4 ; Is player input 3?
+    MOV A, BOARD_X3_Y1
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X3_Y1, A
+    JMP PT_FINALLY
+  PT_IS_4: CJNE A, #04h, PT_IS_5 ; Is player input 4?
+    MOV A, BOARD_X1_Y2
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X1_Y2, A
+    JMP PT_FINALLY
+  PT_IS_5: CJNE A, #05h, PT_IS_6 ; Is player input 5?
+    MOV A, BOARD_X2_Y2
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X2_Y2, A
+    JMP PT_FINALLY
+  PT_IS_6: CJNE A, #06h, PT_IS_7 ; Is player input 6?
+    MOV A, BOARD_X3_Y2
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X3_Y2, A
+    JMP PT_FINALLY
+  PT_IS_7: CJNE A, #07h, PT_IS_8; Is player input 7?
+    MOV A, BOARD_X1_Y3
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X1_Y3, A
+    JMP PT_FINALLY
+  PT_IS_8: CJNE A, #08h, PT_IS_9; IS player input 8?
+    MOV A, BOARD_X2_Y3
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X2_Y3, A
+    JMP PT_FINALLY
+  PT_IS_9: CJNE A, #09h, PT_IS_INVALID; Is player input9?
+    MOV A, BOARD_X3_Y3
+    CJNE A, #00h, PT_IS_INVALID
+    ACALL MB_GET_VALUE
+    MOV BOARD_X3_Y3, A
+    JMP PT_FINALLY
+  PT_IS_INVALID:
+    RET
+  PT_FINALLY:
+    ACALL SUB_SWITCH_PLAYER
+    ACALL SUB_GAME_OVER_CNT
+    ACALL SUB_CHECK_WIN
+    RET
+
+  MB_GET_VALUE:
+    MOV A, ACTIVE_PLAYER
+    CJNE A, #00h, GV_CPU
+      MOV A, VAL_PL
+      RET
+    GV_CPU:
+      MOV A, VAL_CP
+      RET
+
+
+SUB_SWITCH_PLAYER:
+  MOV A, ACTIVE_PLAYER
+  CJNE A, #00h, SP_CPU
+    MOV ACTIVE_PLAYER, #01h
+    JMP SP_FINALLY
+  SP_CPU:
+    MOV ACTIVE_PLAYER, #00h
+  SP_FINALLY:
+    CLR A
+    RET
+
+SUB_GAME_OVER_CNT:
+  INC CNT_MOV
+  MOV A, CNT_MOV
+  CJNE A, #0Ah, GOC_QUIT
+    JMP GAME_OVER
+  GOC_QUIT:
+    CLR A
+    RET
+
+; -- WIP --
+
+SUB_CHECK_WIN: ; Check all possible winning combinations
+  ;Win from X1Y1?
+  ; left to right
+  MOV TMP_1, BOARD_X1_Y1
+  MOV TMP_2, BOARD_X2_Y1
+  MOV TMP_3, BOARD_X3_Y1
+  ACALL SUB_CW_CMP_TMP
+  ; top to bottom
+  MOV TMP_2, BOARD_X1_Y2
+  MOV TMP_3, BOARD_X1_Y3
+  ACALL SUB_CW_CMP_TMP
+  ; tl to br
+  MOV TMP_2, BOARD_X2_Y2
+  MOV TMP_3, BOARD_X3_Y3
+  ACALL SUB_CW_CMP_TMP
+  
+  ;Win from X2Y1?
+  ; top to bottom
+  MOV TMP_1, BOARD_X2_Y1
+  MOV TMP_2, BOARD_X2_Y2
+  MOV TMP_3, BOARD_X2_Y3
+  ACALL SUB_CW_CMP_TMP
+  ; left to right
+  ;  already checked
+
+  ;Win from X3Y1?
+  ; top to bottom
+  MOV TMP_1, BOARD_X3_Y1
+  MOV TMP_2, BOARD_X3_Y2
+  MOV TMP_3, BOARD_X3_Y3
+  ACALL SUB_CW_CMP_TMP
+  ; left to right
+  ;  already checked
+  ; tr to bl
+  MOV TMP_2, BOARD_X2_Y2
+  MOV TMP_3, BOARD_X1_Y3
+  ACALL SUB_CW_CMP_TMP
+
+  ;Win from X1_Y2?
+  ; top to bottom
+  ;  already checked
+  ; left to right
+  MOV TMP_1, BOARD_X1_Y2
+  MOV TMP_2, BOARD_X2_Y2
+  MOV TMP_3, BOARD_X3_Y2
+  ACALL SUB_CW_CMP_TMP
+
+  ;Win from X2_Y2
+  ; everything already checked
+
+  ;Win from X3_Y2
+  ; everything already checked
+
+  ;Win from X1_Y3
+  ; top to bottom
+  ;  already checked
+  ; left to right
+  MOV TMP_1, BOARD_X1_Y3
+  MOV TMP_2, BOARD_X2_Y3
+  MOV TMP_3, BOARD_X3_Y3
+  ACALL SUB_CW_CMP_TMP
+  ; bl to tr
+  ;  already checked
+
+  ;win from X2_Y3
+  ; everything already checked
+
+  ;win from X3_Y3
+  ; everything already checked
+  RET
+  
+SUB_CW_CMP_TMP:
+  ;Compare the 3 TMP vars if equal -> Game over due to win
+  MOV A, TMP_1
+  CJNE A, TMP_2, SUB_NOT_EQUAL
+  CJNE A, TMP_3, SUB_NOT_EQUAL
+  CJNE A, #00h, SUB_WINNER ; only end if match was != 00 (not set)
+  SUB_NOT_EQUAL:
+    RET
+  SUB_WINNER:
+    MOV WINNER, A
+    JMP GAME_OVER
+
+AWAIT_RESET:
+  MOV A, PLAYER_INPUT
+  MOV PLAYER_INPUT, #00h
+  CJNE A, #0fh, SUB_NOT_RESET
+  JMP INIT
+  SUB_NOT_RESET:
+    RET
